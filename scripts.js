@@ -56,23 +56,15 @@ async function parseCertificateSerialNumber(cert) {
         const lines = cert.split("\n").map(line => line.trim()).join("\n");
         let certObj;
 
-        // 尝试解析为 EC 证书
         try {
             certObj = forge.pki.certificateFromPem(lines);
+            return certObj.serialNumber;
         } catch (e) {
-            console.error("Failed to parse as EC certificate:", e);
-            // 如果 EC 解析失败，尝试解析为其他类型的证书
-            try {
-                certObj = forge.pki.certificateFromPem(lines);
-            } catch (err) {
-                console.error("Failed to parse certificate:", err);
-                return null;
-            }
+            console.error("Failed to parse certificate:", e);
+            return null;
         }
-
-        return certObj.serialNumber;
     } catch (e) {
-        console.error("Failed to parse certificate:", e);
+        console.error("Error during certificate parsing:", e);
         return null;
     }
 }
