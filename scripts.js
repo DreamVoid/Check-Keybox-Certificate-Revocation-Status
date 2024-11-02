@@ -21,13 +21,12 @@ async function checkKeybox() {
             return;
         }
 
-        // 尝试解析证书
         try {
             const ecCert = certificates[0].textContent.trim();
             const rsaCert = certificates[3].textContent.trim();
 
-            const ecCertSN = parseCertificateSerialNumber(ecCert);
-            const rsaCertSN = parseCertificateSerialNumber(rsaCert);
+            const ecCertSN = await parseCertificateSerialNumber(ecCert);
+            const rsaCertSN = await parseCertificateSerialNumber(rsaCert);
 
             if (!ecCertSN || !rsaCertSN) {
                 resultDiv.textContent = "Error: Unable to parse certificate serial numbers.";
@@ -52,13 +51,43 @@ async function checkKeybox() {
 }
 
 // 解析证书序列号的辅助函数
-function parseCertificateSerialNumber(cert) {
+async function parseCertificateSerialNumber(cert) {
     try {
         const lines = cert.split("\n").map(line => line.trim()).join("\n");
-        const certObj = forge.pki.certificateFromPem(lines);
+        let certObj;
+
+        // 尝试解析为 EC 证书
+        try {
+            certObj = forge.pki.certificateFromPem(lines);
+        } catch (e) {
+            console.error("Failed to parse as EC certificate:", e);
+            // 如果 EC 解析失败，尝试解析为其他类型的证书
+            try {
+                certObj = forge.pki.certificateFromPem(lines);
+            } catch (err) {
+                console.error("Failed to parse certificate:", err);
+                return null;
+            }
+        }
+
         return certObj.serialNumber;
     } catch (e) {
         console.error("Failed to parse certificate:", e);
         return null;
+    }
+}
+
+// 检查吊销列表的辅助函数
+async function checkRevocationList(ecCertSN, rsaCertSN) {
+    try {
+        const response = await fetch("https://android.googleapis.com/attestation/status", {
+            headers: { "Cache-Control": "max-age=0" }
+        });
+        const revocationList = await response.json();
+
+        return revocationList.entries[ecCertSN] || revocationList.entries[rsaCertSN];
+    } catch (error) {
+        console.error("Failed to fetch revocation list:", error);
+        return false;
     }
 }
