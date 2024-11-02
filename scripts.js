@@ -21,26 +21,31 @@ async function checkKeybox() {
             return;
         }
 
-        const ecCert = certificates[0].textContent.trim();
-        const rsaCert = certificates[3].textContent.trim();
+        // 尝试解析证书
+        try {
+            const ecCert = certificates[0].textContent.trim();
+            const rsaCert = certificates[3].textContent.trim();
 
-        // 尝试解析证书序列号
-        const ecCertSN = parseCertificateSerialNumber(ecCert);
-        const rsaCertSN = parseCertificateSerialNumber(rsaCert);
+            const ecCertSN = parseCertificateSerialNumber(ecCert);
+            const rsaCertSN = parseCertificateSerialNumber(rsaCert);
 
-        if (!ecCertSN || !rsaCertSN) {
+            if (!ecCertSN || !rsaCertSN) {
+                resultDiv.textContent = "Error: Unable to parse certificate serial numbers.";
+                return;
+            }
+
+            // 获取吊销列表
+            const isRevoked = await checkRevocationList(ecCertSN, rsaCertSN);
+
+            resultDiv.innerHTML = `
+                <strong>EC Cert Serial Number:</strong> ${ecCertSN} <br>
+                <strong>RSA Cert Serial Number:</strong> ${rsaCertSN} <br>
+                ${isRevoked ? "<span style='color: red;'>Certificate is revoked!</span>" : "<span style='color: green;'>Certificate is valid.</span>"}
+            `;
+        } catch (error) {
+            console.error("Error parsing certificates:", error);
             resultDiv.textContent = "Error: Unable to parse certificate serial numbers.";
-            return;
         }
-
-        // 获取吊销列表
-        const isRevoked = await checkRevocationList(ecCertSN, rsaCertSN);
-
-        resultDiv.innerHTML = `
-            <strong>EC Cert Serial Number:</strong> ${ecCertSN} <br>
-            <strong>RSA Cert Serial Number:</strong> ${rsaCertSN} <br>
-            ${isRevoked ? "<span style='color: red;'>Certificate is revoked!</span>" : "<span style='color: green;'>Certificate is valid.</span>"}
-        `;
     };
 
     reader.readAsText(file);
@@ -55,20 +60,5 @@ function parseCertificateSerialNumber(cert) {
     } catch (e) {
         console.error("Failed to parse certificate:", e);
         return null;
-    }
-}
-
-// 检查吊销列表的辅助函数
-async function checkRevocationList(ecCertSN, rsaCertSN) {
-    try {
-        const response = await fetch("https://android.googleapis.com/attestation/status", {
-            headers: { "Cache-Control": "max-age=0" }
-        });
-        const revocationList = await response.json();
-
-        return revocationList.entries[ecCertSN] || revocationList.entries[rsaCertSN];
-    } catch (error) {
-        console.error("Failed to fetch revocation list:", error);
-        return false;
     }
 }
