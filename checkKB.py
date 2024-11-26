@@ -1,10 +1,13 @@
-import requests
 import os
+import time
 import xml.etree.ElementTree as ET
+
+import requests
 from cryptography import x509
 
 # 获取吊销列表
-crl = requests.get('https://android.googleapis.com/attestation/status', headers={'Cache-Control': 'max-age=0'}).json()
+api = 'https://android.googleapis.com/attestation/status?{}'.format(time.time_ns())
+crl = requests.get(api, headers={'Cache-Control': 'max-age=0'}).json()
 
 def parse_cert(cert):
     cert = "\n".join(line.strip() for line in cert.strip().split("\n"))
